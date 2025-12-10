@@ -1,0 +1,85 @@
+services:
+  nitro-celestia-node:
+    image: ghcr.io/celestiaorg/nitro:v3.6.8
+    container_name: orbit-annnn-orbit-chain
+    depends_on:
+      - celestia-server
+    ports:
+      - "8547:8449"
+      - "8548:8548"
+      - "9642:9642"
+      - "6070:6070"
+    volumes:
+      - ./config/node-config-661101.json:/home/user/nodeConfig.json:ro
+      - node-data:/home/user/.arbitrum/local/nitro
+    command:
+      - --conf.file
+      - /home/user/nodeConfig.json
+
+  celestia-server:
+    image: ghcr.io/celestiaorg/nitro-das-celestia:v0.6.3-mocha
+    container_name: celestia-server
+    depends_on:
+      - celestia-light
+    entrypoint:
+      - "/bin/celestia-server"
+      - "--celestia.experimental-tx-client"
+      - "--celestia.core-network"
+      - "mocha-4"
+      - "--celestia.core-token"
+      - "tia"
+      - "--celestia.core-url"
+      - "consensus-full-mocha-4.celestia-mocha.com:9090"
+      - "--celestia.with-writer"
+      - "--celestia.namespace-id"
+      - "aaab02f90e1864afed87"
+      - "--rpc-addr"
+      - "0.0.0.0"
+      - "--rpc-port"
+      - "26657"
+      - "--celestia.rpc"
+      - "http://celestia-light:2123"
+      - "--log-level"
+      - "DEBUG"
+      - "--celestia.auth-token"
+      - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdLCJOb25jZSI6IkhOdnJDNnNlSmIvY2I5NDU1YTQ1eXZUVTZxK3h1RGdoclRCWjZxQ0pYOW89IiwiRXhwaXJlc0F0IjoiMDAwMS0wMS0wMVQwMDowMDowMFoifQ.WlDh4Qj8suLYd6h7aEotp4cUrlvKHVrXNERIPPnEwr4"
+      - "--celestia.validator-config.blobstream"
+      - "0xf0c6429ebab2e7dc6e05dafb61128be21f13cb1e"
+      - "--celestia.validator-config.eth-rpc"
+      - "https://ethereum-sepolia.core.chainstack.com/892be8cae6084733c05692e7b9f4640b"
+    ports:
+      - "1317:1317"
+      - "9090:9090"
+      - "26657:26657"
+      - "1095:1095"
+      - "8080:8080"
+      - "26658:26658"
+    volumes:
+      - celestia-keys:/home/celestia/
+
+  celestia-light:
+    image: ghcr.io/celestiaorg/celestia-node:v0.28.4-mocha
+    container_name: celestia-light
+    entrypoint: [""]
+    command:
+      [
+        "celestia",
+        "light",
+        "start",
+        "--p2p.network", "mocha-4",
+        "--core.ip", "consensus-full-mocha-4.celestia-mocha.com",
+        "--core.port", "9090",
+        "--rpc.addr", "0.0.0.0",
+        "--rpc.port", "2123",
+        "--node.store", "/home/celestia"
+      ]
+    ports:
+      - "2121:2121"
+      - "2123:2123"
+    volumes:
+      - ./celes-light:/home/celestia
+
+volumes:
+  node-data:
+  celestia-keys:
+  celestia-light:

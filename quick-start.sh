@@ -48,11 +48,14 @@ if ! command_exists docker; then
 fi
 print_success "Docker is installed"
 
-if ! command_exists docker-compose; then
-    print_error "Docker Compose is not installed. Please install Docker Compose first."
+if docker compose version >/dev/null 2>&1; then
+    print_success "Docker Compose (v2 plugin) is available"
+elif command_exists docker-compose; then
+    print_warning "Using legacy docker-compose binary. Prefer 'docker compose' if available."
+else
+    print_error "Docker Compose is not installed. Please install Docker Compose (docker compose) first."
     exit 1
 fi
-print_success "Docker Compose is installed"
 
 if ! command_exists node; then
     print_error "Node.js is not installed. Please install Node.js 18+ first."
@@ -111,205 +114,175 @@ else
     exit 1
 fi
 
-# Prompt for Celestia configuration
+# Celestia configuration (prompted)
 echo ""
-print_info "Celestia Configuration"
-print_info "Please provide your Celestia node details. Some fields are required for production use."
-echo ""
+print_info "Celestia configuration"
 
-# Core Network
 read -p "$(echo -e ${BLUE}Enter Celestia core network ${NC}[default: mocha-4]: )" CELESTIA_CORE_NETWORK
 CELESTIA_CORE_NETWORK=${CELESTIA_CORE_NETWORK:-mocha-4}
 
-# Core Token (Required)
-echo ""
-print_warning "Core Token is REQUIRED for production use"
-read -p "$(echo -e ${BLUE}Enter your Celestia Core Token: ${NC})" CELESTIA_CORE_TOKEN
-if [ -z "$CELESTIA_CORE_TOKEN" ]; then
-    print_warning "No Core Token provided - node may not function properly!"
-fi
+read -p "$(echo -e ${BLUE}Enter Celestia core token ${NC}[default: tia]: )" CELESTIA_CORE_TOKEN
+CELESTIA_CORE_TOKEN=${CELESTIA_CORE_TOKEN:-tia}
 
-# Core URL (gRPC endpoint)
-echo ""
-print_info "Core URL should be a gRPC endpoint (usually port 9090)"
-print_info "Example: grpc.celestia-mocha.com:9090"
-print_warning "Do NOT include https:// or http:// in the URL"
-read -p "$(echo -e ${BLUE}Enter Celestia Core URL ${NC}[leave empty to skip]: )" CELESTIA_CORE_URL
-if [ -z "$CELESTIA_CORE_URL" ]; then
-    print_warning "No Core URL provided - node may not function properly!"
-fi
+read -p "$(echo -e ${BLUE}Enter Celestia core URL (gRPC) ${NC}[default: consensus-full-mocha-4.celestia-mocha.com:9090]: )" CELESTIA_CORE_URL
+CELESTIA_CORE_URL=${CELESTIA_CORE_URL:-consensus-full-mocha-4.celestia-mocha.com:9090}
 
-# TLS for Core connection
-echo ""
-read -p "$(echo -e ${BLUE}Enable TLS for Core connection? ${NC}[Y/n]: )" ENABLE_TLS
-ENABLE_TLS=${ENABLE_TLS:-y}
-if [[ "$ENABLE_TLS" =~ ^[Nn]$ ]]; then
-    CELESTIA_ENABLE_TLS_FLAG="--celestia-disable-core-tls"
-else
-    CELESTIA_ENABLE_TLS_FLAG=""
-fi
+read -p "$(echo -e ${BLUE}Enter Celestia namespace ID ${NC}[default: aaab02f90e1864afed87]: )" CELESTIA_NAMESPACE
+CELESTIA_NAMESPACE=${CELESTIA_NAMESPACE:-aaab02f90e1864afed87}
 
-# Namespace ID
-echo ""
-print_info "Namespace ID must be exactly 10 bytes (20 hex characters)"
-read -p "$(echo -e ${BLUE}Enter Celestia namespace ID ${NC}[leave empty to auto-generate]: )" CELESTIA_NAMESPACE
+read -p "$(echo -e ${BLUE}Enter Celestia RPC endpoint ${NC}[default: http://celestia-light:2123]: )" CELESTIA_RPC
+CELESTIA_RPC=${CELESTIA_RPC:-http://celestia-light:2123}
 
-# RPC Endpoint
-echo ""
-read -p "$(echo -e ${BLUE}Enter Celestia RPC endpoint ${NC}[default: http://0.0.0.0:26658/]: )" CELESTIA_RPC
-CELESTIA_RPC=${CELESTIA_RPC:-"http://0.0.0.0:26658/"}
-
-# Auth Token (optional)
-echo ""
-read -p "$(echo -e ${BLUE}Enter Celestia auth token ${NC}[leave empty if not required]: )" CELESTIA_AUTH_TOKEN
-
-# Key Path (optional)
-echo ""
-print_info "If you have existing Celestia keys, provide the path to the keys directory"
-print_info "Otherwise, keys will be stored in a Docker volume for persistence"
-print_info "Recommended path for Mocha: \${HOME}/.celestia-light-mocha-4/keys"
-read -p "$(echo -e ${BLUE}Enter path to Celestia keys directory ${NC}[leave empty to use Docker volume]: )" CELESTIA_KEY_PATH
-if [ -n "$CELESTIA_KEY_PATH" ]; then
-    if [ -d "$CELESTIA_KEY_PATH" ]; then
-        print_success "Keys directory found at $CELESTIA_KEY_PATH"
-    else
-        print_warning "Keys directory not found at $CELESTIA_KEY_PATH - will be created if needed"
-    fi
-fi
-
-# Determine script location - check common locations
-GENERATOR_SCRIPT=""
-if [ -f "./generate-docker-compose.ts" ]; then
-    GENERATOR_SCRIPT="./generate-docker-compose.ts"
-elif [ -f "./scripts/generate-docker-compose.ts" ]; then
-    GENERATOR_SCRIPT="./scripts/generate-docker-compose.ts"
-elif [ -f "./scripts/node/generate-docker-compose.ts" ]; then
-    GENERATOR_SCRIPT="./scripts/node/generate-docker-compose.ts"
-elif [ -f "$SCRIPT_DIR/generate-docker-compose.ts" ]; then
-    GENERATOR_SCRIPT="$SCRIPT_DIR/generate-docker-compose.ts"
-else
-    print_error "Could not find generate-docker-compose.ts"
-    print_info "Please ensure the script is in one of:"
-    echo "  - ./generate-docker-compose.ts"
-    echo "  - ./scripts/generate-docker-compose.ts"
-    echo "  - ./scripts/node/generate-docker-compose.ts"
+read -p "$(echo -e ${BLUE}Enter Celestia auth token ${NC}[required]: )" CELESTIA_AUTH_TOKEN
+if [ -z "$CELESTIA_AUTH_TOKEN" ]; then
+    print_error "Celestia auth token is required."
     exit 1
 fi
 
-# Build the command arguments
-ARGS=("--config" "$CONFIG_PATH")
-
-# Add Core Network
-ARGS+=("--celestia-core-network" "$CELESTIA_CORE_NETWORK")
-
-# Add Core Token if provided
-if [ -n "$CELESTIA_CORE_TOKEN" ]; then
-    ARGS+=("--celestia-core-token" "$CELESTIA_CORE_TOKEN")
-fi
-
-# Add Core URL if provided
-if [ -n "$CELESTIA_CORE_URL" ]; then
-    ARGS+=("--celestia-core-url" "$CELESTIA_CORE_URL")
-fi
-
-# Add TLS flag if needed
-if [ -n "$CELESTIA_ENABLE_TLS_FLAG" ]; then
-    ARGS+=("$CELESTIA_ENABLE_TLS_FLAG")
-fi
-
-# Add Namespace if provided
-if [ -n "$CELESTIA_NAMESPACE" ]; then
-    ARGS+=("--celestia-namespace" "$CELESTIA_NAMESPACE")
-fi
-
-# Add RPC
-ARGS+=("--celestia-rpc" "$CELESTIA_RPC")
-
-# Add Auth Token if provided
-if [ -n "$CELESTIA_AUTH_TOKEN" ]; then
-    ARGS+=("--celestia-auth-token" "$CELESTIA_AUTH_TOKEN")
-fi
-
-# Add Key Path if provided
-if [ -n "$CELESTIA_KEY_PATH" ]; then
-    ARGS+=("--celestia-key-path" "$CELESTIA_KEY_PATH")
-fi
-
-# Generate docker-compose.yml
-echo ""
-print_info "Generating docker-compose.yml..."
-npx tsx "$GENERATOR_SCRIPT" "${ARGS[@]}"
-
-if [ $? -eq 0 ]; then
-    print_success "docker-compose.yml generated successfully"
-else
-    print_error "Failed to generate docker-compose.yml"
+read -p "$(echo -e ${BLUE}Enter Celestia validator blobstream address ${NC}[required]: )" CELESTIA_BLOBSTREAM
+if [ -z "$CELESTIA_BLOBSTREAM" ]; then
+    print_error "Celestia validator blobstream address is required."
     exit 1
 fi
 
-# Validation warnings
-echo ""
-if [ -z "$CELESTIA_CORE_TOKEN" ] || [ -z "$CELESTIA_CORE_URL" ]; then
-    print_warning "⚠️  IMPORTANT: Missing required configuration!"
-    echo ""
-    if [ -z "$CELESTIA_CORE_TOKEN" ]; then
-        echo "  • Core Token is missing - this is REQUIRED for production"
-    fi
-    if [ -z "$CELESTIA_CORE_URL" ]; then
-        echo "  • Core URL is missing - this is REQUIRED for production"
-    fi
-    echo ""
-    print_info "You can edit docker-compose.yml manually to add these values later"
-    echo ""
+read -p "$(echo -e ${BLUE}Enter Celestia validator ETH RPC URL ${NC}[required]: )" CELESTIA_VALIDATOR_ETH_RPC
+if [ -z "$CELESTIA_VALIDATOR_ETH_RPC" ]; then
+    print_error "Celestia validator ETH RPC URL is required."
+    exit 1
 fi
 
-# Ask if user wants to start the node
-read -p "$(echo -e ${BLUE}Do you want to start the node now? ${NC}[Y/n]: )" START_NODE
-START_NODE=${START_NODE:-y}
+read -p "$(echo -e ${BLUE}Enter Celestia light p2p network ${NC}[default: mocha-4]: )" CELESTIA_P2P_NETWORK
+CELESTIA_P2P_NETWORK=${CELESTIA_P2P_NETWORK:-mocha-4}
 
-if [[ "$START_NODE" =~ ^[Yy]$ ]]; then
-    print_info "Starting Docker containers..."
-    docker-compose up -d
+read -p "$(echo -e ${BLUE}Enter Celestia core IP ${NC}[default: consensus-full-mocha-4.celestia-mocha.com]: )" CELESTIA_CORE_IP
+CELESTIA_CORE_IP=${CELESTIA_CORE_IP:-consensus-full-mocha-4.celestia-mocha.com}
 
-    if [ $? -eq 0 ]; then
-        print_success "Node started successfully!"
-        echo ""
-        print_info "Node Information:"
-        echo "  RPC Endpoint: http://localhost:8547"
-        echo "  Metrics: http://localhost:6070"
-        echo ""
-        print_info "Celestia Server Ports:"
-        echo "  API: http://localhost:1317"
-        echo "  gRPC: http://localhost:9090"
-        echo "  RPC: http://localhost:26657"
-        echo "  Other: 1095, 8080"
-        echo ""
-        print_info "Useful Commands:"
-        echo "  View logs: docker-compose logs -f nitro-celestia-node"
-        echo "  View Celestia logs: docker-compose logs -f celestia-server"
-        echo "  Stop node: docker-compose down"
-        echo "  Restart node: docker-compose restart"
-        echo ""
-        print_info "Testing the connection..."
-        sleep 5
+read -p "$(echo -e ${BLUE}Enter Celestia core port ${NC}[default: 9090]: )" CELESTIA_CORE_PORT
+CELESTIA_CORE_PORT=${CELESTIA_CORE_PORT:-9090}
 
-        CHAIN_ID=$(curl -s -X POST http://localhost:8547 \
-            -H "Content-Type: application/json" \
-            -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' 2>/dev/null | grep -o '"result":"[^"]*"' | cut -d'"' -f4)
+read -p "$(echo -e ${BLUE}Enter Celestia node store path ${NC}[default: /home/celestia]: )" CELESTIA_NODE_STORE
+CELESTIA_NODE_STORE=${CELESTIA_NODE_STORE:-/home/celestia}
 
-        if [ -n "$CHAIN_ID" ] && [ "$CHAIN_ID" != "null" ]; then
-            print_success "Node is responding! Chain ID: $CHAIN_ID"
-        else
-            print_warning "Node started but not responding yet. Please wait a few minutes for initialization."
-            print_info "Check logs with: docker-compose logs -f nitro-celestia-node"
-        fi
-    else
-        print_error "Failed to start Docker containers"
-        exit 1
-    fi
-else
-    print_info "Docker Compose file generated. Start the node with: docker-compose up -d"
-fi
+print_info "Core network: $CELESTIA_CORE_NETWORK"
+print_info "Core token: $CELESTIA_CORE_TOKEN"
+print_info "Core URL (gRPC): $CELESTIA_CORE_URL"
+print_info "Namespace ID: $CELESTIA_NAMESPACE"
+print_info "Celestia RPC: $CELESTIA_RPC"
+print_info "Blobstream: $CELESTIA_BLOBSTREAM"
+print_info "Validator ETH RPC: $CELESTIA_VALIDATOR_ETH_RPC"
+print_info "Light p2p network: $CELESTIA_P2P_NETWORK"
+print_info "Core IP/Port: $CELESTIA_CORE_IP:$CELESTIA_CORE_PORT"
+print_info "Node store: $CELESTIA_NODE_STORE"
+print_info "Auth token (first 12 chars): ${CELESTIA_AUTH_TOKEN:0:12}..."
 
+# Normalize config path for Docker bind mount
+CONFIG_PATH_ABS="$(cd "$(dirname "$CONFIG_PATH")" && pwd)/$(basename "$CONFIG_PATH")"
+
+# Generate docker-compose.yml mirroring the provided template
 echo ""
-print_success "Setup complete!"
+print_info "Writing docker-compose.yml with preset Celestia values..."
+cat > "$SCRIPT_DIR/docker-compose.yml" <<EOF
+services:
+  nitro-celestia-node:
+    image: ghcr.io/celestiaorg/nitro:v3.6.8
+    container_name: orbit-annnn-orbit-chain
+    depends_on:
+      - celestia-server
+    ports:
+      - "8547:8449"
+      - "8548:8548"
+      - "9642:9642"
+      - "6070:6070"
+    volumes:
+      - ${CONFIG_PATH_ABS}:/home/user/nodeConfig.json:ro
+      - node-data:/home/user/.arbitrum/local/nitro
+    command:
+      - --conf.file
+      - /home/user/nodeConfig.json
+
+  celestia-server:
+    image: ghcr.io/celestiaorg/nitro-das-celestia:v0.6.3-mocha
+    container_name: celestia-server
+    depends_on:
+      - celestia-light
+    entrypoint:
+      - "/bin/celestia-server"
+      - "--celestia.experimental-tx-client"
+      - "--celestia.core-network"
+      - "${CELESTIA_CORE_NETWORK}"
+      - "--celestia.core-token"
+      - "${CELESTIA_CORE_TOKEN}"
+      - "--celestia.core-url"
+      - "${CELESTIA_CORE_URL}"
+      - "--celestia.with-writer"
+      - "--celestia.namespace-id"
+      - "${CELESTIA_NAMESPACE}"
+      - "--rpc-addr"
+      - "0.0.0.0"
+      - "--rpc-port"
+      - "26657"
+      - "--celestia.rpc"
+      - "${CELESTIA_RPC}"
+      - "--log-level"
+      - "DEBUG"
+      - "--celestia.auth-token"
+      - "${CELESTIA_AUTH_TOKEN}"
+      - "--celestia.validator-config.blobstream"
+      - "${CELESTIA_BLOBSTREAM}"
+      - "--celestia.validator-config.eth-rpc"
+      - "${CELESTIA_VALIDATOR_ETH_RPC}"
+    ports:
+      - "1317:1317"
+      - "9090:9090"
+      - "26657:26657"
+      - "1095:1095"
+      - "8080:8080"
+      - "26658:26658"
+    volumes:
+      - celestia-keys:/home/celestia/
+
+  celestia-light:
+    image: ghcr.io/celestiaorg/celestia-node:v0.28.4-mocha
+    container_name: celestia-light
+    entrypoint: [""]
+    command:
+      [
+        "celestia",
+        "light",
+        "start",
+        "--p2p.network", "${CELESTIA_P2P_NETWORK}",
+        "--core.ip", "${CELESTIA_CORE_IP}",
+        "--core.port", "${CELESTIA_CORE_PORT}",
+        "--rpc.addr", "0.0.0.0",
+        "--rpc.port", "2123",
+        "--node.store", "${CELESTIA_NODE_STORE}"
+      ]
+    ports:
+      - "2121:2121"
+      - "2123:2123"
+    volumes:
+      - ./celes-light:/home/celestia
+
+volumes:
+  node-data:
+  celestia-keys:
+  celestia-light:
+EOF
+
+print_success "docker-compose.yml written to $SCRIPT_DIR/docker-compose.yml"
+
+# Manual next steps (no automatic docker compose run)
+echo ""
+print_info "Next steps (run manually with 'docker compose'):"
+echo " 1) Start Celestia light node: docker compose up -d celestia-light"
+echo "    - Wait ~20 minutes for initial sync."
+echo "    - Check logs: docker compose logs -f celestia-light"
+echo "    - If issues, stop to inspect: docker compose down"
+echo ""
+echo " 2) Start Celestia server: docker compose up -d celestia-server"
+echo "    - Check logs: docker compose logs -f celestia-server"
+echo ""
+echo " 3) Start Nitro node: docker compose up -d nitro-celestia-node"
+echo "    - Check logs: docker compose logs -f nitro-celestia-node"
+echo ""
+print_success "Setup complete! docker-compose.yml is ready."
