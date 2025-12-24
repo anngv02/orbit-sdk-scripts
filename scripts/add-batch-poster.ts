@@ -9,18 +9,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 config({ path: resolve(__dirname, '../.env') });
 
-// --- CẤU HÌNH ---
+// --- CONFIGURATION ---
 
-// 1. Địa chỉ Sequencer Inbox
+// 1. Sequencer Inbox Address
 const SEQUENCER_INBOX_ADDRESS = "0xe92B27e9d19fc9024F79a9bF130D26166634D47A"; 
 
 // 2. Upgrade Executor
 const UPGRADE_EXECUTOR_ADDRESS = "0x1919A903B4e6CfBb0Eec3abd826D2122B49e13f6";
 
-// 3. ⚠️ ĐỊA CHỈ BATCH POSTER MỚI (ĐIỀN VÀO ĐÂY)
+// 3. ⚠️ NEW BATCH POSTER ADDRESS (FILL THIS IN)
 const NEW_BATCH_POSTER_ADDRESS = "0x72D013b3Cac89cf870943e383d6Fc6812814F414"; 
 
-// ABI của SequencerInbox để set Batch Poster
+// ABI for SequencerInbox to set Batch Poster
 const SEQUENCER_INBOX_ABI = [
   {
     inputs: [
@@ -34,7 +34,7 @@ const SEQUENCER_INBOX_ABI = [
   }
 ] as const;
 
-// ABI của UpgradeExecutor để thực thi lệnh
+// ABI for UpgradeExecutor to execute command
 const EXECUTOR_ABI = [
   {
     inputs: [{ name: "target", type: "address" }, { name: "payload", type: "bytes" }],
@@ -46,10 +46,10 @@ const EXECUTOR_ABI = [
 ] as const;
 
 async function main() {
-  console.log("🚀 BẮT ĐẦU THÊM BATCH POSTER...");
+  console.log("🚀 STARTING ADD BATCH POSTER...");
   console.log("------------------------------------------------");
 
-  if (!process.env.PRIVATE_KEY) throw new Error("❌ Thiếu PRIVATE_KEY trong .env");
+  if (!process.env.PRIVATE_KEY) throw new Error("❌ Missing PRIVATE_KEY in .env");
   const pk = process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`;
   const account = privateKeyToAccount(pk as `0x${string}`);
   
@@ -66,27 +66,26 @@ async function main() {
     transport: http(rpcUrl)
   });
 
-  console.log(`👤 Admin thực hiện: ${account.address}`);
+  console.log(`👤 Executing Admin: ${account.address}`);
   console.log(`🎯 Target Contract (SequencerInbox): ${SEQUENCER_INBOX_ADDRESS}`);
-  console.log(`new Batch Poster: ${NEW_BATCH_POSTER_ADDRESS}`);
+  console.log(`New Batch Poster: ${NEW_BATCH_POSTER_ADDRESS}`);
 
-  // 1. Đóng gói lệnh "setIsBatchPoster"
-  // Lưu ý: Hàm này nhận (address, bool) chứ không phải mảng như setValidator
+  // 1. Encode "setIsBatchPoster" command
   const payload = encodeFunctionData({
     abi: SEQUENCER_INBOX_ABI,
     functionName: 'setIsBatchPoster',
     args: [
       NEW_BATCH_POSTER_ADDRESS as `0x${string}`, 
-      true // true = cấp quyền, false = thu hồi quyền
+      true // true = grant permission, false = revoke permission
     ]
   });
 
-  console.log(`📦 Payload đã đóng gói. Đang gửi transaction...`);
+  console.log(`📦 Payload encoded. Sending transaction...`);
 
-  // 2. GỬI TRANSACTION qua UpgradeExecutor
+  // 2. SEND TRANSACTION via UpgradeExecutor
   try {
     // executeCall(target, payload)
-    // target ở đây phải là SEQUENCER_INBOX_ADDRESS
+    // target here must be SEQUENCER_INBOX_ADDRESS
     const hash = await client.writeContract({
       address: UPGRADE_EXECUTOR_ADDRESS as `0x${string}`,
       abi: EXECUTOR_ABI,
@@ -95,22 +94,22 @@ async function main() {
     });
 
     console.log(`✅ Transaction sent! Hash: ${hash}`);
-    console.log(`⏳ Đang chờ xác nhận...`);
-    console.log(`👉 Theo dõi tại: https://sepolia.etherscan.io/tx/${hash}`);
+    console.log(`⏳ Waiting for confirmation...`);
+    console.log(`👉 Track at: https://sepolia.etherscan.io/tx/${hash}`);
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     
     if (receipt.status === 'success') {
-        console.log(`🎉 THÀNH CÔNG! Batch Poster mới đã được thêm.`);
-        console.log(`   Địa chỉ: ${NEW_BATCH_POSTER_ADDRESS}`);
-        console.log(`   Bạn có thể dùng địa chỉ này để chạy node Batch Poster dự phòng.`);
+        console.log(`🎉 SUCCESS! New Batch Poster has been added.`);
+        console.log(`   Address: ${NEW_BATCH_POSTER_ADDRESS}`);
+        console.log(`   You can use this address to run a backup Batch Poster node.`);
     } else {
-        console.error(`❌ Transaction thất bại (Reverted)`);
+        console.error(`❌ Transaction failed (Reverted)`);
     }
 
   } catch (e: any) {
-    console.error("❌ Lỗi xảy ra:", e);
-    if (e.cause) console.error("Nguyên nhân:", e.cause);
+    console.error("❌ Error occurred:", e);
+    if (e.cause) console.error("Cause:", e.cause);
   }
 }
 
