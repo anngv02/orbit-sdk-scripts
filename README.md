@@ -302,6 +302,5 @@ After deployment, you may want to add additional validators or batch posters to 
 - If the `create rollup` transaction reverts, change the `CHAIN_ID` + `CHAIN_NAME` pair.
 - Keep ≥0.5 ETH for the batch poster and ≥1 ETH for the validator before deploying.
 - When you hit RPC issues, switch to backup endpoints listed in `.env`.
-- For peer-dependency warnings during `npm install`, run `npm install --legacy-peer-deps`.
 
 Keep your `.env` private and always back up the deployment artifacts to operate your nodes safely.
