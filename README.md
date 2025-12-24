@@ -111,7 +111,7 @@ MAX_FEE_PER_GAS=100000000
   -v $(pwd)/celes-light:/home/celestia \
   ghcr.io/celestiaorg/celestia-node:v0.28.4-mocha \
   celestia light auth admin \
-    --p2p.network mocha \
+  --p2p.network mocha \
     --node.store /home/celestia
 </code>
 
@@ -127,11 +127,165 @@ MAX_FEE_PER_GAS=100000000
 12. If permission issues, add `user: "0:0"` under `celestia-server` in `docker-compose.yml`.
 13. Use `celestia-server` logs to read block height and cross-check on Celenium.
 
+## Running a Validator Node
+
+After setting up your sequencer node, you can run an additional validator node to participate in consensus and validate blocks. The validator node will forward execution requests to the sequencer while independently validating state transitions.
+
+### Prerequisites
+
+1. **Validator Configuration File**: Ensure you have a validator node configuration file (e.g., `config/node-config-{chainId}-validator.json`). This file should have:
+   - `sequencer: false` - Validator nodes are not sequencers
+   - `staker.enable: true` - Enable staking/validation
+   - `staker.parent-chain-wallet.private-key` - Validator wallet private key
+   - `execution.forwarding-target` - URL to forward execution requests (usually your sequencer node)
+   - `da-provider.enable: true` - Enable Celestia data availability
+
+2. **Validator Address**: The validator address (derived from the private key) must be added to the rollup using `npm run add-validator` (see [Adding Validators](#adding-validators-and-batch-posters)).
+
+3. **Validator Wallet**: The validator wallet needs at least **1 Sepolia ETH** for staking and gas fees.
+
+### Adding Validator Service to Docker Compose
+
+Add the validator service to your `docker-compose.yml`:
+
+```yaml
+  nitro-celestia-node-validator:
+    image: ghcr.io/celestiaorg/nitro:v3.6.8
+    container_name: orbit-{chain-name}-validator
+    depends_on:
+      - celestia-server
+    ports:
+      - "8557:8449"    # HTTP RPC (different port from sequencer)
+      - "8558:8548"    # WS RPC
+      - "9643:9642"    # P2P
+      - "6071:6070"    # Metrics
+    volumes:
+      - ./config/node-config-{chainId}-validator.json:/home/user/nodeConfig.json:ro
+      - node-data-validator:/home/user/.arbitrum/local/nitro
+    command:
+      - --conf.file
+      - /home/user/nodeConfig.json
+
+volumes:
+  # ... existing volumes ...
+  node-data-validator:
+```
+
+**Important Notes**:
+- Use different ports than the sequencer node to avoid conflicts
+- Use a separate volume (`node-data-validator`) for validator data persistence
+- The validator config should point to the sequencer via `forwarding-target` (e.g., `http://orbit-annnn-orbit-chain:8449`)
+
+### Starting the Validator Node
+
+1. Ensure the sequencer node and Celestia services are running:
+   ```bash
+   docker compose up -d celestia-light celestia-server nitro-celestia-node
+   ```
+
+2. Start the validator node:
+   ```bash
+   docker compose up -d nitro-celestia-node-validator
+   ```
+
+3. Monitor validator logs:
+   ```bash
+   docker compose logs -f nitro-celestia-node-validator
+   ```
+
+4. Check validator metrics:
+   - HTTP RPC: `http://localhost:8557`
+   - Metrics: `http://localhost:6071`
+
+### Validator Node Configuration
+
+The validator node configuration (`node-config-{chainId}-validator.json`) should include:
+
+- **Staker Configuration**:
+  ```json
+  "staker": {
+    "enable": true,
+    "strategy": "MakeNodes",
+    "parent-chain-wallet": {
+      "private-key": "your-validator-private-key"
+    }
+  }
+  ```
+
+
+### Troubleshooting Validator Node
+
+- **Connection Issues**: Ensure the `forwarding-target` URL matches your sequencer container name and port
+- **Staking Errors**: Verify the validator address is added to the rollup and has sufficient ETH
+- **Sync Issues**: Validator nodes sync from the parent chain, ensure `PARENT_CHAIN_RPC` is accessible
+- **Port Conflicts**: If ports are already in use, change the host ports in docker-compose.yml
+
 ## After deployment
 
 - Deployment metadata lives in `deployments/deployment-{chainId}-{timestamp}.json`.
-- Node configuration lives in `config/chain-{chainId}.json`.
+- Node configuration lives in `config/node-config-{chainId}.json` (for sequencer).
+- Validator node configuration lives in `config/node-config-{chainId}-validator.json` (for validators).
 - Use these files to bring up sequencer nodes, validator nodes, RPC endpoints, and to deploy your dApps on the new L2.
+
+## Adding Validators and Batch Posters
+
+After deployment, you may want to add additional validators or batch posters to your rollup. These operations require admin privileges through the Upgrade Executor.
+
+### Adding a Validator
+
+1. Open `scripts/add-validator.ts` and update the configuration:
+   - `ROLLUP_ADDRESS`: Your rollup contract address (found in deployment files)
+   - `UPGRADE_EXECUTOR_ADDRESS`: Your upgrade executor address (found in deployment files)
+   - `NEW_VALIDATOR_ADDRESS`: The address of the validator you want to add
+
+2. Ensure your `.env` file has:
+   - `PRIVATE_KEY`: Admin private key with permission to call `executeCall` on the Upgrade Executor
+   - `PARENT_CHAIN_RPC`: Sepolia RPC endpoint
+
+3. Run the script:
+   ```bash
+   npm run add-validator
+   ```
+
+   Or directly:
+   ```bash
+   npx tsx scripts/add-validator.ts
+   ```
+
+4. The script will:
+   - Encode the `setValidator` call for the Rollup contract
+   - Execute it through the Upgrade Executor's `executeCall` function
+   - Wait for transaction confirmation
+   - Display the transaction hash and Etherscan link
+
+### Adding a Batch Poster
+
+1. Open `scripts/add-batch-poster.ts` and update the configuration:
+   - `SEQUENCER_INBOX_ADDRESS`: Your Sequencer Inbox contract address (found in deployment files)
+   - `UPGRADE_EXECUTOR_ADDRESS`: Your upgrade executor address (found in deployment files)
+   - `NEW_BATCH_POSTER_ADDRESS`: The address of the batch poster you want to add
+
+2. Ensure your `.env` file has:
+   - `PRIVATE_KEY`: Admin private key with permission to call `executeCall` on the Upgrade Executor
+   - `PARENT_CHAIN_RPC`: Sepolia RPC endpoint
+
+3. Run the script:
+   ```bash
+   npm run add-batch-poster
+   ```
+
+   Or directly:
+   ```bash
+   npx tsx scripts/add-batch-poster.ts
+   ```
+
+4. The script will:
+   - Encode the `setIsBatchPoster` call for the Sequencer Inbox contract
+   - Execute it through the Upgrade Executor's `executeCall` function
+   - Wait for transaction confirmation
+   - Display success message with the new batch poster address
+
+**Note**: Both scripts require the admin wallet to have sufficient Sepolia ETH for gas fees. The addresses can be found in your deployment files located in the `deployments/` directory.
 
 ## Useful scripts
 
@@ -140,6 +294,8 @@ MAX_FEE_PER_GAS=100000000
 | `npm run check-balance` | Check deployer and batch-poster wallet balances |
 | `npm run deploy` | Deploy a new Orbit rollup to Sepolia |
 | `npm run parse-deployment` | Parse the deployment txs and extract contract addresses |
+| `npm run add-validator` | Add a new validator to the rollup via Upgrade Executor |
+| `npm run add-batch-poster` | Add a new batch poster to the rollup via Upgrade Executor |
 
 ## Quick troubleshooting
 
