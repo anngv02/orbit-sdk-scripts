@@ -10,7 +10,9 @@
     "check-balance": "tsx scripts/check-balance.ts",
     "parse-deployment": "tsx scripts/parse-deployment.ts",
     "verify-contracts": "tsx scripts/verify-contracts.ts",
-    "debug": "tsx scripts/debug-deployment.ts"
+    "debug": "tsx scripts/debug-deployment.ts",
+    "add-validator": "tsx scripts/add-validator.ts",
+    "add-batch-poster": "tsx scripts/add-batch-poster.ts"
   },
   "keywords": [
     "arbitrum",
