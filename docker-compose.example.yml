@@ -10,8 +10,25 @@ services:
       - "9642:9642"
       - "6070:6070"
     volumes:
-      - ./config/node-config-661101.json:/home/user/nodeConfig.json:ro
+      - ./config/node-config-135666.json:/home/user/nodeConfig.json:ro
       - node-data:/home/user/.arbitrum/local/nitro
+    command:
+      - --conf.file
+      - /home/user/nodeConfig.json
+
+  nitro-celestia-node-validator:
+    image: ghcr.io/celestiaorg/nitro:v3.6.8
+    container_name: orbit-annnn-orbit-chain-validator
+    depends_on:
+      - celestia-server
+    ports:
+      - "8557:8449"
+      - "8558:8548"
+      - "9643:9642"
+      - "6071:6070"
+    volumes:
+      - ./config/node-config-135666-validator.json:/home/user/nodeConfig.json:ro
+      - node-data-validator:/home/user/.arbitrum/local/nitro
     command:
       - --conf.file
       - /home/user/nodeConfig.json
@@ -29,10 +46,10 @@ services:
       - "--celestia.core-token"
       - "tia"
       - "--celestia.core-url"
-      - "consensus-full-mocha-4.celestia-mocha.com:9090"
+      - "rpc-mocha.pops.one:9090"
       - "--celestia.with-writer"
       - "--celestia.namespace-id"
-      - "aaab02f90e1864afed87"
+      - "aaab02f90e1864afed10"
       - "--rpc-addr"
       - "0.0.0.0"
       - "--rpc-port"
@@ -41,8 +58,9 @@ services:
       - "http://celestia-light:2123"
       - "--log-level"
       - "DEBUG"
+      # - "--skip.auth-token"
       - "--celestia.auth-token"
-      - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdLCJOb25jZSI6IkhOdnJDNnNlSmIvY2I5NDU1YTQ1eXZUVTZxK3h1RGdoclRCWjZxQ0pYOW89IiwiRXhwaXJlc0F0IjoiMDAwMS0wMS0wMVQwMDowMDowMFoifQ.WlDh4Qj8suLYd6h7aEotp4cUrlvKHVrXNERIPPnEwr4"
+      - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdLCJOb25jZSI6IlJYMVVSYWVxZGJQR1VMUXFkUnI0NjVrT1ZCV3hYclhscnlzK0ZMSXJweEE9IiwiRXhwaXJlc0F0IjoiMDAwMS0wMS0wMVQwMDowMDowMFoifQ.C6Au4u3_qx0NvDBWx1QisWCen_Dubct48DxndXK-xqE"
       - "--celestia.validator-config.blobstream"
       - "0xf0c6429ebab2e7dc6e05dafb61128be21f13cb1e"
       - "--celestia.validator-config.eth-rpc"
@@ -67,7 +85,7 @@ services:
         "light",
         "start",
         "--p2p.network", "mocha-4",
-        "--core.ip", "consensus-full-mocha-4.celestia-mocha.com",
+        "--core.ip", "rpc-mocha.pops.one",
         "--core.port", "9090",
         "--rpc.addr", "0.0.0.0",
         "--rpc.port", "2123",
@@ -81,5 +99,6 @@ services:
 
 volumes:
   node-data:
+  node-data-validator:
   celestia-keys:
   celestia-light:
