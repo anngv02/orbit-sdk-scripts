@@ -1,0 +1,14 @@
+═══════════════════════════════════════════════
+Deployed Contract Addresses:
+═══════════════════════════════════════════════
+Rollup:                   0xDc833c373C2EC5d6FE16e504468EA4A507E7d10f
+Inbox:                    0x6C10D1f15BdDe2a241d3AaA2c70D20c2B49eaca9
+Outbox:                   0x6A96C4f56225600Cd0B288feCF9a53a188D3146C
+Rollup Event Inbox:       0xaaFaE36dABb4C4bC5f8B4bdb6F9380181f170c90
+Challenge Manager:        0x01b0Aa885BCC0232d7C5c29b5a59a2e0f22d08BE
+Admin Proxy:              0x08BDd6d888c0D99c55ddD4E4d3C7682810732695
+Sequencer Inbox:          0xe92B27e9d19fc9024F79a9bF130D26166634D47A
+Bridge:                   0x98BA57794bc6Aa4d00c3540d0E2e23D748d3Ae4e
+Upgrade Executor:         0x1919A903B4e6CfBb0Eec3abd826D2122B49e13f6
+Validator Wallet Creator: 0x0dc485e30069a567a78825E20E43A0Aec96b273B
+═══════════════════════════════════════════════

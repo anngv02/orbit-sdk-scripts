@@ -64,7 +64,7 @@ services:
       - "--celestia.validator-config.blobstream"
       - "0xf0c6429ebab2e7dc6e05dafb61128be21f13cb1e"
       - "--celestia.validator-config.eth-rpc"
-      - "https://ethereum-sepolia.core.chainstack.com/892be8cae6084733c05692e7b9f4640b"
+      - "...RPC URL..."
     ports:
       - "1317:1317"
       - "9090:9090"
